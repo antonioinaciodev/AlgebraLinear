@@ -1,87 +1,99 @@
 from sympy import symbols, sympify, linsolve, Matrix
-from sympy.sets.sets import EmptySet
-
-x, y, z = symbols("x y z")
+from sympy import SympifyError
 
 
-def get_expression():
-    expression = input("Digite a transformação T(x,y,z): ")
-    return sympify(expression)
+def get_spaces():
+    while True:
+        try:
+            dim_dom, dim_contra = str(input("Digite as dimensões do domínio e contradomínio: ")).strip().split(" ")
+            dim_dom, dim_contra = int(dim_dom), int(dim_contra)
+            break
+        except ValueError:
+            print("valor inválido")
 
+    vars = []
+    while True:
+        vars = input(f"Digite as variáveis: ").strip().lower().split()
 
-def vet_null():
-    return [0, 0, 0]
+        if len(vars) != dim_dom:
+            print("Quantidade incorreta de variáveis")
+            continue
 
-
-def matrix_t(expression_list):
-    matriz = []
-    vars = (x, y, z)
-    
-    for expressao in expression_list:
-        linha_da_matriz = []
+        variaveis_validas = True
         for var in vars:
-            linha_da_matriz.append(expressao.coeff(var))
-        matriz.append(linha_da_matriz)
-    return Matrix(matriz)
+            if not var.isidentifier():
+                print(f"Variável inválida: {var}")
+                variaveis_validas = False
+                break
+
+        if variaveis_validas:
+            break
+
+    return dim_dom, dim_contra, vars
 
 
-def exibir_autoval_autovet(lista_expressoes):
-    matriz_A = matrix_t(lista_expressoes)
-    print(f"Matriz de Transformação A:\n{matriz_A}\n")
+def get_expression(dim_dom, dim_contra, vars):
+    while True:
+        entrada = input(f"Digite as {dim_contra} coordenadas da transformação (separadas por vírgulas): ").strip().lower()
+        expressao = [parte.strip() for parte in entrada.split(",")]
 
-    if not matriz_A.is_square:
-        print("Autovalores e autovetores são definidos apenas para matrizes quadradas.")
-        return
+        if len(expressao) != dim_contra:
+            print(f"Quantidade incorreta de coordenadas. Esperado: {dim_contra}")
+            continue
 
-    try:
-        # eigenvects() retorna uma lista de tuplas: (autovalor, multiplicidade_alg, [autovetores_base])
-        autoval_autovet_data = matriz_A.eigenvects()
-    except Exception as e:
-        print(f"Erro ao calcular autovalores/autovetores: {e}")
-        return
-
-    if not autoval_autovet_data:
-        print("Não foram encontrados autovalores/autovetores (ou a matriz é tal que o método não os retorna).")
-        return
-
-    for autoval, multiplicidade, vetores_base_matrix_list in autoval_autovet_data:
-        print(f"Autovalor: {autoval} (Multiplicidade Algébrica: {multiplicidade})")
-        
-        autovetores_formatados = []
-        for vetor_matrix in vetores_base_matrix_list:
-            autovetores_formatados.append(list(vetor_matrix))
-        print(f"Autovetores: (base para o autoespaço): {autovetores_formatados}")
+        return sympify(expressao)
 
 
-def dim_NucT(kernel):
-    return len(kernel) if kernel != [[0, 0, 0]] else 0
+def autovalores_autovetores(expression, vars):
+    dim = len(vars)
+    sym_vars = symbols(vars)
 
+    # Base canônica
+    base_canonica = [[1 if i == j else 0 for i in range(dim)] for j in range(dim)]
 
-def dim_ImT(kernel):
-    return 3 - dim_NucT(kernel)
+    # Matriz da transformação
+    colunas = []
+    for vetor in base_canonica:
+        imagem = [expr.subs(dict(zip(sym_vars, vetor))) for expr in expression]
+        colunas.append(imagem)
+
+    matriz = Matrix(colunas).T
+
+    # Cálculo de autovalores e autovetores
+    autovalores = matriz.eigenvals()
+    autovetores = matriz.eigenvects()
+
+    return matriz, autovalores, autovetores
 
 
 def main():
-    expressions = [[x, y, z], [0, 0, 0], [x, 2*y, 3*z], [x-y, y-z, z-x], [x+y+z, 0, 0]]
     while True:
-        for i in range(5):
-            print("T:ℝ³ -> ℝ³")
-            
-            # expression = get_expression()
-            expression = sympify(expressions[i])
-            
-            
-            
-            print(f"\nTransformação: {expression}\n")
-            exibir_autoval_autovet(expression)
-            print()
+        dim_dom, dim_contra, vars = get_spaces()
 
-        # if input("Deseja encerrar?(sim/não) ").strip().lower() == "sim":
-        #     break
-        break
+        if dim_dom != dim_contra:
+            print("A transformação deve ser quadrada para ter autovalores e autovetores.")
+            continue
+
+        expression = get_expression(dim_dom, dim_contra, vars)
+
+        matriz, autovalores, autovetores = autovalores_autovetores(expression, vars)
+
+        print(f"\nTransformação: {expression}")
+        print(f"Matriz da transformação na base canônica:\n{matriz}")
+
+        print("\nAutovalores:")
+        for val, mult in autovalores.items():
+            print(f"  {val} (multiplicidade: {mult})")
+
+        print("\nAutovetores:")
+        for val, mult, vetores in autovetores:
+            print(f"\n  Para λ = {val}:")
+            for v in vetores:
+                print(f"    {v}")
+
+        if input("\nDeseja encerrar? (sim/não): ").strip().lower() == "sim":
+            break
 
 
 if __name__ == "__main__":
     main()
-    # entrada é: transformação do R³ --> R³
-    # saída é: autovalores, autovetores
